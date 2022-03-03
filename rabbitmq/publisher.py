@@ -4,6 +4,7 @@ import os
 
 
 dataJson = os.environ.get("dataJson")
+data = json.load(open(dataJson, 'r'))
 
 
 
@@ -11,7 +12,7 @@ connection = pika.BlockingConnection(pika.ConnectionParameters("localhost"))
 channel = connection.channel()
 
 channel.exchange_declare(
-    exchange="product",
+    exchange="person",
     exchange_type="direct"
 )
 
@@ -19,9 +20,9 @@ channel.exchange_declare(
 
 
 channel.basic_publish(
-    exchange="product",
-    routing_key="product.notify",
-    body=json.dumps(dataJson)
+    exchange="person",
+    routing_key="person.notify",
+    body=json.dumps(data)
     )
        
    
@@ -32,6 +33,5 @@ print("[x] sent notify message")
 
 
 connection.close()
-
 
 

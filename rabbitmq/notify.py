@@ -12,13 +12,13 @@ SCHEMA_PATH = os.environ.get("SCMA")
 connection = pika.BlockingConnection(pika.ConnectionParameters("localhost"))
 channel = connection.channel()
 
-queue = channel.queue_declare("product.notify")
+queue = channel.queue_declare("person.notify")
 queue_name = queue.method.queue
 
 channel.queue_bind(
-    exchange="product",
+    exchange="person",
     queue=queue_name ,
-    routing_key="product.notify"
+    routing_key="person.notify"
 
 )
 
@@ -26,7 +26,6 @@ channel.queue_bind(
 def callback(ch,method,properties,body):
     payload=json.loads(body)
    
-
     validatorCheck(payload,SCHEMA_PATH)
     
     ch.basic_ack(delivery_tag=method.delivery_tag)

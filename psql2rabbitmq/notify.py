@@ -1,6 +1,6 @@
 import pika
 import json
-from psql2rabbitmq.script import validatorCheck
+from script import validatorCheck
 import os
 
 
@@ -25,6 +25,7 @@ channel.queue_bind(
 
 def callback(ch,method,properties,body):
     payload=json.loads(body)
+   
 
     validatorCheck(payload,SCHEMA_PATH)
     

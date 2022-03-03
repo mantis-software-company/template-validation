@@ -23,7 +23,7 @@ def validatorCheck(data,SCHEMA_PATH) :
             schema = foo.Schemas()
         
             schema.load(jsonDta)
-
+            
            
     except ValidationError as err:
         print(err)

@@ -3,9 +3,7 @@ import json
 import os
 
 
-
-path = os.path.basename("data.json")
-
+dataJson = os.environ.get("dataJson")
 
 
 
@@ -23,7 +21,7 @@ channel.exchange_declare(
 channel.basic_publish(
     exchange="product",
     routing_key="product.notify",
-    body=json.dumps(path)
+    body=json.dumps(dataJson)
     )
        
    

@@ -3,8 +3,11 @@ import json
 import os
 
 
+
 dataJson = os.environ.get("dataJson")
-data = json.load(open(dataJson, 'r'))
+with open(dataJson) as f:
+  data = json.load(f)
+
 
 
 

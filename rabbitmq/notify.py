@@ -1,15 +1,15 @@
 
-
-import functools
 from script import validatorCheck
 import pika
 from pika.exchange_type import ExchangeType
 import os
 import json
+import sys
+from setting import SCHEMA_PATH
 
 
-SCHEMA_PATH = os.environ.get("SCMA")
 
+commandReq = sys.argv[1]
 
 def on_message(ch,method,properties,body):
     payload=json.loads(body)
@@ -22,13 +22,13 @@ def main():
     connection = pika.BlockingConnection(pika.ConnectionParameters("localhost"))
 
     channel = connection.channel()
-    queue = channel.queue_declare("person.notify")
+    queue = channel.queue_declare(commandReq)
     queue_name = queue.method.queue
    
     channel.queue_bind(
-        exchange="person",
+        exchange=commandReq,
         queue=queue_name ,
-        routing_key="person.notify"
+        routing_key=commandReq
 
     )
     

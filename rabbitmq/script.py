@@ -5,55 +5,49 @@ import json
 from importlib.machinery import SourceFileLoader
 import pika
 
+
+
 connection = pika.BlockingConnection(pika.ConnectionParameters("localhost"))
 channel = connection.channel()
 
 
-def erIndexContrl(errIndex,scmaData) :
-    newErrArr = []
+
+def IndexContrl(errIndex,scmaData) :
    
-  
-    for index  in errIndex :
-        newErrArr.append(scmaData[index])
+    def findError(n):
+        return scmaData[n]
 
+    def findValid(n):
+        return  scmaData.pop(n)
 
-    for index  in sorted(errIndex, reverse=True) :
-        scmaData.pop(index)
+   
+    resultErr = list(map(findError, errIndex))
+    resultValid = list(map(findValid,sorted(errIndex,reverse=True)))  
 
-    def printQueue(newErrArr,scmaData):
-        channel.exchange_declare(
-        exchange="error",
-        exchange_type="direct"
+   
 
-            )
-
+    def printQueue(resultErr,resultValid):
+        
+     
 
         channel.basic_publish(
         exchange="error",
-        routing_key="error.notify",
-        body=json.dumps(newErrArr)
-        #  errordata kuyruga ıletılecek
+        routing_key="error",
+        body=json.dumps(resultErr)
+      
         )
 
-       
-
-        channel.exchange_declare(
-        exchange="valid",
-        exchange_type="direct"
-
-            )
-
-
+    
         channel.basic_publish(
         exchange="valid",
-        routing_key="valid.notify",
-        body=json.dumps(scmaData)
+        routing_key="valid",
+        body=json.dumps(resultValid)
      
         )
         print("[x] sent err data")
         print("[x] sent valid data")
    
-    printQueue(newErrArr,scmaData)
+    printQueue(resultErr,resultValid)
   
 
 def validatorCheck(data,SCHEMA_PATH) :
@@ -65,8 +59,12 @@ def validatorCheck(data,SCHEMA_PATH) :
        
         schema = foo.Schemas(many=True)
             
-        schema.load(data,partial=True)
-        
+        result = schema.load(data,partial=True)
+        errIndex = []
+        IndexContrl(errIndex,result)
+
+
+
     
     except ValidationError as err:
        
@@ -74,7 +72,7 @@ def validatorCheck(data,SCHEMA_PATH) :
         scmaData = err.data
         
       
-        erIndexContrl(errIndex,scmaData)
+        IndexContrl(errIndex,scmaData)
         
 
    

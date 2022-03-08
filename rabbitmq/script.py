@@ -1,10 +1,14 @@
 
 
+from msilib.schema import Error
 from marshmallow import  ValidationError, validates
 import json
 from importlib.machinery import SourceFileLoader
 import pika
+from setting import ERROR,VALİD
 
+ERROR = str(ERROR)
+VALİD = str(VALİD)
 
 
 connection = pika.BlockingConnection(pika.ConnectionParameters("localhost"))
@@ -30,16 +34,16 @@ def queuContrl(errIndex,scmaData) :
      
 
         channel.basic_publish(
-        exchange="error",
-        routing_key="error",
+        exchange=ERROR,
+        routing_key=ERROR,
         body=json.dumps(resultErr)
       
         )
 
     
         channel.basic_publish(
-        exchange="valid",
-        routing_key="valid",
+        exchange=VALİD,
+        routing_key=VALİD,
         body=json.dumps(scmaData)
      
         )

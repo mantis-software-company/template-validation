@@ -1,7 +1,10 @@
 import pika
 import json
 import os
-from setting import DATA_JSON
+from setting import DATA_JSON,PERSON
+
+PERSON = str(PERSON)
+
 
 with open(DATA_JSON) as f:
   data = json.load(f)
@@ -17,14 +20,14 @@ def fetch_and_publish():
   try:
 
     channel.exchange_declare(
-          exchange="person",
+          exchange=PERSON,
           exchange_type="direct"
         )
 
         
     channel.basic_publish(
-          exchange="person",
-          routing_key="person",
+          exchange=PERSON,
+          routing_key=PERSON,
           body=json.dumps(data)
           )
             

@@ -12,7 +12,7 @@ channel = connection.channel()
 
 
 
-def IndexContrl(errIndex,scmaData) :
+def queuContrl(errIndex,scmaData) :
    
     def findError(n):
         return scmaData[n]
@@ -22,11 +22,10 @@ def IndexContrl(errIndex,scmaData) :
 
    
     resultErr = list(map(findError, errIndex))
-    resultValid = list(map(findValid,sorted(errIndex,reverse=True)))  
+    list(map(findValid,sorted(errIndex,reverse=True)))  
+ 
 
-   
-
-    def printQueue(resultErr,resultValid):
+    def printQueue(resultErr,scmaData):
         
      
 
@@ -41,13 +40,13 @@ def IndexContrl(errIndex,scmaData) :
         channel.basic_publish(
         exchange="valid",
         routing_key="valid",
-        body=json.dumps(resultValid)
+        body=json.dumps(scmaData)
      
         )
         print("[x] sent err data")
         print("[x] sent valid data")
    
-    printQueue(resultErr,resultValid)
+    printQueue(resultErr,scmaData)
   
 
 def validatorCheck(data,SCHEMA_PATH) :
@@ -59,20 +58,19 @@ def validatorCheck(data,SCHEMA_PATH) :
        
         schema = foo.Schemas(many=True)
             
-        result = schema.load(data,partial=True)
+        scmaData = schema.load(data,partial=True)
         errIndex = []
-        IndexContrl(errIndex,result)
 
 
 
     
     except ValidationError as err:
        
-        errIndex = err.messages.keys()
+        errIndex = err.messages.keys() 
         scmaData = err.data
         
       
-        IndexContrl(errIndex,scmaData)
+    queuContrl(errIndex,scmaData)
         
 
    

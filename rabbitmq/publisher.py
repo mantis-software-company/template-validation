@@ -1,8 +1,10 @@
 import pika
 import json
 import os
-from setting import DATA_JSON,PERSON
 
+
+DATA_JSON = os.environ.get("dataJson")
+PERSON = os.environ.get("PERSON")
 PERSON = str(PERSON)
 
 

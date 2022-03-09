@@ -5,7 +5,11 @@ from marshmallow import  ValidationError, validates
 import json
 from importlib.machinery import SourceFileLoader
 import pika
-from setting import ERROR,VALİD
+import os
+
+
+ERROR = os.environ.get("ERROR")
+VALİD = os.environ.get("VALİD")
 
 ERROR = str(ERROR)
 VALİD = str(VALİD)

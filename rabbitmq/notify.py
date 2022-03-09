@@ -5,11 +5,15 @@ from pika.exchange_type import ExchangeType
 import os
 import json
 import sys
-from setting import SCHEMA_PATH
 
 
 
-commandReq = sys.argv[1]
+SCHEMA_PATH = os.environ.get("SCMA")
+
+
+
+
+commandReq = sys.argv[1] 
 
 def on_message(ch,method,properties,body):
     payload=json.loads(body)

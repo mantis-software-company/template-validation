@@ -13,16 +13,41 @@ import os
 async def main(config=None) -> None:
     loop = asyncio.get_event_loop()
 
-    async def get_connection() -> AbstractRobustConnection:
-        return await aio_pika.connect_robust("amqp://guest:guest@localhost/")
 
-    connection_pool: Pool = Pool(get_connection, max_size=2, loop=loop)
+    if config is None:
+        config = {
+            "data_json":os.environ.get("DATA_JSON"),
+            "schema_path":os.environ.get("SCHEMA_PATH"),
+            "mq_data_valid": os.environ.get('MQ_DATA_VALID'),
+            "mq_data_invalid": os.environ.get('MQ_DATA_INVALID'),
+            "consumer_pool_size": os.environ.get("CONSUMER_POOL_SIZE"),
+            "connect_address": os.environ.get("CONNECT_ADDRESS"),
+        
+        }
+
+
+    if "consumer_pool_size" in config:
+        if config.get("consumer_pool_size"):
+            try:
+                consumer_pool_size = int(config.get("consumer_pool_size"))
+            except TypeError as e:
+                print("Invalid pool size: %s" % (consumer_pool_size,))
+                   
+                raise e
+
+    
+    async def get_connection() -> AbstractRobustConnection:
+        return await aio_pika.connect_robust(config.get("connect_address"))
+        
+   
+
+    connection_pool: Pool = Pool(get_connection, max_size=consumer_pool_size, loop=loop)
 
     async def get_channel() -> aio_pika.Channel:
         async with connection_pool.acquire() as connection:
             return await connection.channel()
 
-    channel_pool: Pool = Pool(get_channel, max_size=2, loop=loop)
+    channel_pool: Pool = Pool(get_channel, max_size=consumer_pool_size, loop=loop)
    
 
 
@@ -75,10 +100,6 @@ async def main(config=None) -> None:
             await validatorCheck(data,scmaPath)
            
 
-
-
-
-
     async def consume(consumer_id) -> None:
         
         
@@ -86,11 +107,11 @@ async def main(config=None) -> None:
            
            
             queue = await channel.declare_queue(
-                 config.get("data_invalid"), durable=False, auto_delete=False,
+                 config.get("mq_data_invalid"), durable=False, auto_delete=False,
             )
 
             queue2 = await channel.declare_queue(
-                  config.get("data_valid"), durable=False, auto_delete=False,
+                  config.get("mq_data_valid"), durable=False, auto_delete=False,
             )
            
             while True :
@@ -101,15 +122,15 @@ async def main(config=None) -> None:
                     m = await queue.get(timeout=300 * 1)
                     message = m.body.decode('utf-8')
 
-                    mtwo = await queue2.get(timeout=300 * 1)
-                    messagetwo = mtwo.body.decode('utf-8')
+                    n = await queue2.get(timeout=300 * 1)
+                    messageQueue = n.body.decode('utf-8')
 
             
                     try :
-                        j = json.loads(message)
-                        jtwo = json.loads(messagetwo)
-                        print(f" [x] {m.routing_key!r}:{j!r}")
-                        print(f" [x] {mtwo.routing_key!r}:{jtwo!r}")
+                        messageLoads = json.loads(message)
+                        messageQueueLoads = json.loads(messageQueue)
+                        print(f" [x] {m.routing_key!r}:{messageLoads!r}")
+                        print(f" [x] {n.routing_key!r}:{messageQueueLoads!r}")
                         
                         
                     except Exception as e:
@@ -118,17 +139,9 @@ async def main(config=None) -> None:
                     m.ack()
                     
 
-            
                 except aio_pika.exceptions.QueueEmpty:
                     print("Consumer %s: Queue empty. Stopping." % consumer_id)
                     break
-                
-            
-
-               
-           
-           
-           
          
     async def publish(invalidData,validData) -> None:
         async with channel_pool.acquire() as channel:  
@@ -139,7 +152,7 @@ async def main(config=None) -> None:
                    
                 ),
              
-                config.get("data_valid"),
+                config.get("mq_data_valid"),
             )
 
 
@@ -149,27 +162,19 @@ async def main(config=None) -> None:
                    
                 ),
              
-                config.get("data_invalid"),
+                config.get("mq_data_invalid"),
             )
 
-    if config is None:
-        config = {
-            "data_json":os.environ.get("dataJson"),
-            "schema_path":os.environ.get("SCMA"),
-            "data_valid": os.environ.get('MQ_DATA_VALID'),
-            "data_invalid": os.environ.get('MQ_DATA_INVALID'),
-        
-        }
+   
 
 
     async with connection_pool, channel_pool:
         consumer_pool = []
         print("consumer started")
-        for i in range(1):
+        for i in range(consumer_pool_size):
             consumer_pool.append(consume(consumer_id=i))
       
         await asyncio.gather(*consumer_pool)
-
 
 
 if __name__ == "__main__":

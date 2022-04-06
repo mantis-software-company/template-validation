@@ -22,6 +22,7 @@ async def main(config=None) -> None:
             "mq_data_invalid": os.environ.get('MQ_DATA_INVALID'),
             "consumer_pool_size": os.environ.get("CONSUMER_POOL_SIZE"),
             "connect_address": os.environ.get("CONNECT_ADDRESS"),
+            "mq_data_queue": os.environ.get("MQ_DATA_QUEUE"),
         
         }
 
@@ -52,7 +53,7 @@ async def main(config=None) -> None:
 
 
     
-    async def queuContrl(errIndex,scmaData) :
+    async def queuContrl(errIndex,scmaData,channel,queuInvalid,queuValid) :
         def findError(n):
             return scmaData[n]
 
@@ -63,12 +64,30 @@ async def main(config=None) -> None:
         resultErr = list(map(findError, errIndex))
         list(map(findValid,sorted(errIndex,reverse=True)))  
         
-        await publish(resultErr,scmaData)
+        await channel.default_exchange.publish(
+            aio_pika.Message(
+                    body=json.dumps(resultErr).encode(),
+                   
+                ),
+             
+                queuInvalid,
+            )
+
+
+        await channel.default_exchange.publish(
+            aio_pika.Message(
+                    body=json.dumps(scmaData).encode(),
+                   
+                ),
+             
+                queuValid,
+            )
+
        
       
   
         
-    async def validatorCheck(data,SCHEMA_PATH) :
+    async def validatorCheck(data,SCHEMA_PATH,channel,queuInvalid,queuValid) :
 
         foo = SourceFileLoader("module.name", SCHEMA_PATH+".py").load_module()
 
@@ -89,81 +108,56 @@ async def main(config=None) -> None:
             scmaData = err.data
             
         
-        await queuContrl(errIndex,scmaData)
+        await queuContrl(errIndex,scmaData,channel,queuInvalid,queuValid)
        
 
-    async def readData():
-        dataJson = config.get("data_json")
+    async def readData(dataJson,channel,queuInvalid,queuValid):
         scmaPath = config.get("schema_path")
         with open(dataJson) as f:
             data = json.load(f)
-            await validatorCheck(data,scmaPath)
+            await validatorCheck(data,scmaPath,channel,queuInvalid,queuValid)
            
 
     async def consume(consumer_id) -> None:
         
         
-        async with channel_pool.acquire() as channel:  
-           
-           
-            queue = await channel.declare_queue(
-                 config.get("mq_data_invalid"), durable=False, auto_delete=False,
-            )
+        async with channel_pool.acquire() as channel:
+            await channel.set_qos(10)
 
-            queue2 = await channel.declare_queue(
-                  config.get("mq_data_valid"), durable=False, auto_delete=False,
+            queue = await channel.declare_queue(
+                config.get("mq_data_queue"), durable=False, auto_delete=False,
             )
            
+          
+       
             while True :
-                await readData()
+
+
+                async with queue.iterator() as queue_iter:
+                    async for message in queue_iter:
+                        async with message.process():
+                            msg = json.loads(message.body)
+                            await readData(msg,channel,config.get("mq_data_invalid"), config.get("mq_data_valid"))
+                    
+                            await message.ack()
+                await publish(config.get("data_json"),config.get("mq_data_queue"))
+                await asyncio.sleep(0.1)
                 
                
-                try:
-                    m = await queue.get(timeout=300 * 1)
-                    message = m.body.decode('utf-8')
-
-                    n = await queue2.get(timeout=300 * 1)
-                    messageQueue = n.body.decode('utf-8')
-
-            
-                    try :
-                        messageLoads = json.loads(message)
-                        messageQueueLoads = json.loads(messageQueue)
-                        print(f" [x] {m.routing_key!r}:{messageLoads!r}")
-                        print(f" [x] {n.routing_key!r}:{messageQueueLoads!r}")
-                        
-                        
-                    except Exception as e:
-                        print("error" % (e,))
-                        raise e
-                    m.ack()
-                    
-
-                except aio_pika.exceptions.QueueEmpty:
-                    print("Consumer %s: Queue empty. Stopping." % consumer_id)
-                    break
-         
-    async def publish(invalidData,validData) -> None:
+          
+        
+    async def publish(data,queue) -> None:
         async with channel_pool.acquire() as channel:  
        
             await channel.default_exchange.publish(
                 aio_pika.Message(
-                    body=json.dumps(invalidData).encode(),
+                    body=json.dumps(data).encode(),
                    
                 ),
              
-                config.get("mq_data_valid"),
+                queue,
             )
 
-
-            await channel.default_exchange.publish(
-                aio_pika.Message(
-                    body=json.dumps(validData).encode(),
-                   
-                ),
-             
-                config.get("mq_data_invalid"),
-            )
 
    
 

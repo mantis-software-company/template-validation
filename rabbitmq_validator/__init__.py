@@ -38,7 +38,7 @@ async def main(config=None) -> None:
 
     
     async def get_connection() -> AbstractRobustConnection:
-        return await aio_pika.connect_robust(config.get("connect_address"))
+        return await aio_pika.connect_robust("amqp://guest:guest@127.0.0.1/",loop=loop)
         
    
 
@@ -51,8 +51,6 @@ async def main(config=None) -> None:
     channel_pool: Pool = Pool(get_channel, max_size=consumer_pool_size, loop=loop)
    
 
-
-    
     async def queuContrl(errIndex,scmaData,channel,queuInvalid,queuValid) :
         def findError(n):
             return scmaData[n]
@@ -83,35 +81,26 @@ async def main(config=None) -> None:
                 queuValid,
             )
 
-       
       
-  
-        
     async def validatorCheck(data,SCHEMA_PATH,channel,queuInvalid,queuValid) :
 
         foo = SourceFileLoader("module.name", SCHEMA_PATH+".py").load_module()
 
         try :
-                
-        
             schema = foo.Schemas(many=True)
                 
             scmaData = schema.load(data,partial=True)
             errIndex = []
 
-
-
-        
         except ValidationError as err:
         
             errIndex = err.messages.keys() 
             scmaData = err.data
-            
-        
         await queuContrl(errIndex,scmaData,channel,queuInvalid,queuValid)
        
 
     async def readData(dataJson,channel,queuInvalid,queuValid):
+       
         scmaPath = config.get("schema_path")
         with open(dataJson) as f:
             data = json.load(f)
@@ -120,35 +109,23 @@ async def main(config=None) -> None:
 
     async def consume(consumer_id) -> None:
         
-        
         async with channel_pool.acquire() as channel:
-            await channel.set_qos(10)
-
+           
             queue = await channel.declare_queue(
                 config.get("mq_data_queue"), durable=False, auto_delete=False,
             )
            
-          
-       
-            while True :
 
-
-                async with queue.iterator() as queue_iter:
+            async with queue.iterator() as queue_iter: 
                     async for message in queue_iter:
-                        async with message.process():
-                            msg = json.loads(message.body)
-                            await readData(msg,channel,config.get("mq_data_invalid"), config.get("mq_data_valid"))
-                    
-                            await message.ack()
-                await publish(config.get("data_json"),config.get("mq_data_queue"))
-                await asyncio.sleep(0.1)
+                        msg = json.loads(message.body)
+                        await readData(dataJson=msg,channel=channel,queuInvalid=config.get("mq_data_invalid"), queuValid=config.get("mq_data_valid"))
+                        await message.ack()
                 
-               
-          
-        
     async def publish(data,queue) -> None:
+        
         async with channel_pool.acquire() as channel:  
-       
+            
             await channel.default_exchange.publish(
                 aio_pika.Message(
                     body=json.dumps(data).encode(),
@@ -158,17 +135,15 @@ async def main(config=None) -> None:
                 queue,
             )
 
-
-   
-
-
     async with connection_pool, channel_pool:
         consumer_pool = []
         print("consumer started")
         for i in range(consumer_pool_size):
             consumer_pool.append(consume(consumer_id=i))
-      
+        
+        await publish(data=config.get("data_json"),queue=config.get("mq_data_queue")) 
         await asyncio.gather(*consumer_pool)
+        
 
 
 if __name__ == "__main__":
